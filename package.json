@@ -1,0 +1,22 @@
+{
+  "name": "websocketizer-client",
+  "version": "1.0.6",
+  "description": "Websocketizer client",
+  "author": "Giuseppe Menti <mentifg@gmail.com>",
+  "main": "./lib/index.js",
+  "license": "ISC",
+  "scripts": {
+    "start": "node ./lib/index.js",
+    "watch": "nodemon --watch src --exec \" npm run build && npm run start \"",
+    "build": "rimraf lib && babel src -d lib",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.18.0",
+    "babel-preset-airbnb": "^2.1.1",
+    "eslint": "^3.10.2",
+    "eslint-config-airbnb-base": "^10.0.1",
+    "eslint-plugin-import": "^2.2.0",
+    "rimraf": "^2.5.4"
+  }
+}
