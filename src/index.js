@@ -126,6 +126,15 @@ function Client(uri) {
   this.on = (key, callback) => {
     this.jobs[key] = callback;
   };
+
+  /**
+   * Load notifier to manage connection.
+   *
+   * @param  {Function} notifier
+   */
+  this.loadNotifier = (notifier) => {
+    notifier(this);
+  };
 }
 
 export default Client;
