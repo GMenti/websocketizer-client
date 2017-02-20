@@ -88,7 +88,10 @@ function Client(uri) {
 
     instance.onclose = () => {
       this.startReconnecter();
-      this._onDisconnect();
+
+      if (!this.reconnecter) {
+        this._onDisconnect();
+      }
     };
 
     instance.onerror = () => {
