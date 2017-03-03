@@ -55,31 +55,12 @@ function Client(uri) {
   this.reconnectAmount = 0;
 
   /**
-   * Reconnecter interval
-   *
-   * @type {Timer}
-   */
-  this.reconnecter = null;
-
-  /**
    * Start reconnecter interval.
    */
-  this.startReconnecter = () => {
-    if (this.instance.readyState !== CONNECTED_STATE && this.reconnectAmount === 0) {
-      this.reconnecter = setInterval(() => {
-        this.reconnectAmount += 1;
-        this.connect();
-      }, 2500);
-    }
-  };
-
-  /**
-   * Stop reconnecter interval.
-   */
-  this.stopReconnecter = () => {
-    if (this.reconnectAmount > 0) {
-      this.reconnectAmount = 0;
-      clearInterval(this.reconnecter);
+  this.reconnect = () => {
+    if (this.instance.readyState !== CONNECTED_STATE) {
+      this.reconnectAmount += 1;
+      this.connect();
     }
   };
 
@@ -90,7 +71,7 @@ function Client(uri) {
     const instance = new global.WebSocket(uri);
 
     instance.onopen = () => {
-      this.stopReconnecter();
+      this.reconnectAmount = 0;
       this._onConnect();
     };
 
@@ -99,11 +80,11 @@ function Client(uri) {
         this._onDisconnect();
       }
 
-      this.startReconnecter();
+      setTimeout(this.reconnect, 2500);
     };
 
     instance.onerror = () => {
-      this.startReconnecter();
+      setTimeout(this.reconnect, 2500);
     };
 
     instance.onmessage = (message) => {
