@@ -58,7 +58,7 @@ function Client(uri) {
    * Start reconnecter interval.
    */
   this.startReconnecter = () => {
-    if (this.instance.readyState !== CONNECTED_STATE && !this.reconnecter) {
+    if (this.instance.readyState !== CONNECTED_STATE && this.reconnecter !== null) {
       this.reconnecter = setInterval(() => {
         this.connect();
       }, 2500);
@@ -87,11 +87,12 @@ function Client(uri) {
     };
 
     instance.onclose = () => {
-      this.startReconnecter();
-
-      if (!this.reconnecter) {
+      if (this.reconnecter !== null) {
         this._onDisconnect();
       }
+      
+
+      this.startReconnecter();
     };
 
     instance.onerror = () => {
