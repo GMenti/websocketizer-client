@@ -71,11 +71,15 @@ function Client(uri) {
     const instance = new global.WebSocket(uri);
 
     instance.onopen = () => {
+      console.log('open');
+
       this.reconnectAmount = 0;
       this._onConnect();
     };
 
     instance.onclose = () => {
+      console.log('close');
+
       if (this.reconnectAmount === 0) {
         this._onDisconnect();
       }
@@ -84,6 +88,7 @@ function Client(uri) {
     };
 
     instance.onerror = () => {
+      console.log('error');
       setTimeout(this.reconnect, 2500);
     };
 
