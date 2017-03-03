@@ -48,6 +48,13 @@ function Client(uri) {
   this.instance = {};
 
   /**
+   * Reconnecting errors amount.
+   *
+   * @type {number}
+   */
+  this.reconnectAmount = 0;
+
+  /**
    * Reconnecter interval
    *
    * @type {Timer}
@@ -58,8 +65,9 @@ function Client(uri) {
    * Start reconnecter interval.
    */
   this.startReconnecter = () => {
-    if (this.instance.readyState !== CONNECTED_STATE && this.reconnecter !== null) {
+    if (this.instance.readyState !== CONNECTED_STATE && this.reconnectAmount > 0) {
       this.reconnecter = setInterval(() => {
+        this.reconnectAmount += 1;
         this.connect();
       }, 2500);
     }
@@ -69,9 +77,9 @@ function Client(uri) {
    * Stop reconnecter interval.
    */
   this.stopReconnecter = () => {
-    if (this.reconnecter) {
+    if (this.reconnectAmount > 0) {
+      this.reconnectAmount = 0;
       clearInterval(this.reconnecter);
-      this.reconnecter = null;
     }
   };
 
@@ -87,10 +95,9 @@ function Client(uri) {
     };
 
     instance.onclose = () => {
-      if (this.reconnecter !== null) {
+      if (this.reconnecting) {
         this._onDisconnect();
       }
-      
 
       this.startReconnecter();
     };
