@@ -1,86 +1,139 @@
+const Packets = require('packets');
+const Socket = global.WebSocket ? global.WebSocket : require('websocket').w3cwebsocket;
+
+/**
+ * Connected state.
+ *
+ * @type {number}
+ */
 const CONNECTED_STATE = 1;
 
-function Client(uri) {
-  /**
-   * Jobs to execute on receive message packet.
-   *
-   * @type {Array}
-   */
-  this.jobs = [];
+/**
+ * Time to reconnect in ms.
+ *
+ * @type {number}
+ */
+const RECONNECT_TIME = 2500;
 
-  /**
-   * Callback to execute on connect to server.
-   *
-   * @type {Function}
-   */
-  this._onConnect = () => {};
+/**
+ * Default identifiers of packets.
+ *
+ * @type {object}
+ */
+const IDENTIFIERS = {
+  PACKETS: 'packets',
+};
 
+/**
+ * Parse message data and return.
+ *
+ * @param {object} message
+ * @return {Array}
+ */
+const parseData = (message) => {
+  try {
+    return JSON.parse(message.data);
+  } catch (error) {
+    return [];
+  }
+};
+
+class Client {
   /**
-   * Callback to execute on disconnect from server.
+   * Contructor of client instance.
    *
-   * @type {Function}
+   * @param {string} uri
+   * @param {Array} jobs
    */
-  this._onDisconnect = () => {};
+  constructor(uri) {
+    this.onConnectCallback = () => {};
+    this.onDisconnectCallback = () => {};
+    this.clientPackets = {};
+    this.serverPackets = {};
+    this.uri = uri;
+    this.jobsToTransform = {};
+    this.jobs = {};
+    this.instance = null;
+  }
 
   /**
    * Add callback to execute on connect to server.
    *
-   * @param  {Function} callback
+   * @param {function} callback
    */
-  this.onConnect = (callback) => {
-    this._onConnect = callback;
-  };
+  onConnect(callback) {
+    if (typeof callback !== 'function') {
+      throw new Error("Job to process 'onConnect' must be a function");
+    }
+
+    this.onConnectCallback = callback;
+  }
 
   /**
    * Add callback to execute on disconnect from connection.
    *
-   * @param  {Function} callback
+   * @param {function} callback
    */
-  this.onDisconnect = (callback) => {
-    this._onDisconnect = callback;
-  };
-
-  /**
-   * Instance of ws.
-   *
-   * @type {Object}
-   */
-  this.instance = {};
-
-  /**
-   * Reconnecting errors amount.
-   *
-   * @type {number}
-   */
-  this.reconnectAmount = 0;
-
-  /**
-   * Start reconnecter interval.
-   */
-  this.reconnect = () => {
-    if (this.instance.readyState !== CONNECTED_STATE) {
-      this.reconnectAmount += 1;
-      this.connect();
+  onDisconnect(callback) {
+    if (typeof callback !== 'function') {
+      throw new Error("Job to process 'onDisconnect' must be a function");
     }
-  };
+
+    this.onDisconnectCallback = callback;
+  }
 
   /**
-   * Start new websocket server.
+   * Add job to transform and process on receive packet.
+   *
+   * @param {string} key
+   * @param {function} callback
    */
-  this.connect = () => {
-    const instance = new global.WebSocket(uri);
+  on(key, callback) {
+    if (typeof callback !== 'function') {
+      throw new Error(`Job to process '${key}' must be a function`);
+    }
 
-    instance.onopen = () => {
-      this.reconnectAmount = 0;
-      this._onConnect();
+    this.jobsToTransform[key] = callback;
+  }
+
+  /**
+   * Emit packet to server.
+   *
+   * @param {string} key
+   * @param {*} data
+   */
+  emit(key, data) {
+    const packetIdentifier = this.clientPackets.get(key);
+
+    if (!this.instance) {
+      throw new Error(`Server offline, failed to emit ${key}`);
+    }
+
+    this.instance.send(JSON.stringify([packetIdentifier, data]));
+  }
+
+  /**
+   * Connect to the server uri.
+   */
+  connect() {
+    let reconnectAmount = 0;
+    const instance = new Socket(this.uri);
+
+    instance.open = () => {
+      reconnectAmount = 0;
     };
 
     instance.onclose = () => {
-      if (this.reconnectAmount === 0) {
-        this._onDisconnect();
+      if (reconnectAmount === 0) {
+        this.onDisconnectCallback();
       }
 
-      setTimeout(this.reconnect, 2500);
+      setTimeout(() => {
+        if (this.instance.readyState !== CONNECTED_STATE) {
+          reconnectAmount += 1;
+          this.connect();
+        }
+      }, RECONNECT_TIME);
     };
 
     instance.onerror = () => {
@@ -88,45 +141,46 @@ function Client(uri) {
     };
 
     instance.onmessage = (message) => {
-      try {
-        const response = JSON.parse(message.data);
-        this.jobs[response[0]](response[1]);
-      } catch (error) {
-        //
+      const [packetIdentifier, data] = parseData(message);
+
+      if (packetIdentifier === IDENTIFIERS.PACKETS) {
+        this.clientPackets = new Packets(data.clientPackets);
+        this.serverPackets = new Packets(data.serverPackets);
+
+        const jobs = {};
+
+        Object.keys(this.jobsToTransform).forEach((key) => {
+          const packetId = this.serverPackets.get(key);
+          jobs[packetId] = this.jobsToTransform[key];
+        });
+
+        this.jobs = jobs;
+        this.onConnectCallback();
+      } else if (this.jobs[packetIdentifier]) {
+        this.jobs[packetIdentifier](data);
       }
     };
 
     this.instance = instance;
-  };
-
-  /**
-   * Emit packet to server.
-   *
-   * @param  {String} key
-   * @param  {Any} data
-   */
-  this.emit = (key, data) => {
-    this.instance.send(JSON.stringify([key, data]));
-  };
-
-  /**
-   * Save a job for specific packet.
-   *
-   * @param  {String} key
-   * @param  {Function} callback
-   */
-  this.on = (key, callback) => {
-    this.jobs[key] = callback;
-  };
-
-  /**
-   * Load notifier to manage connection.
-   *
-   * @param  {Function} notifier
-   */
-  this.loadNotifier = (notifier) => {
-    notifier(this);
-  };
+  }
 }
 
-export default Client;
+const client = new Client('ws://localhost:8080');
+
+client.onConnect(() => {
+  console.log('connected');
+  client.emit('ping');
+});
+
+client.onDisconnect(() => {
+  console.log('disconnected');
+});
+
+client.on('pong', () => {
+  console.log('received pong');
+});
+
+client.connect();
+
+
+module.exports = Client;
