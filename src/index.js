@@ -54,6 +54,7 @@ class Client {
     this.jobsToTransform = {};
     this.jobs = {};
     this.instance = null;
+    this.connected = false;
   }
 
   /**
@@ -105,32 +106,31 @@ class Client {
   emit(key, data) {
     const packetIdentifier = this.clientPackets.get(key);
 
-    if (!this.instance) {
-      throw new Error(`Server offline, failed to emit ${key}`);
+    try {
+      this.instance.send(JSON.stringify([packetIdentifier, data]));
+    } catch (error) {
+      //
     }
-
-    this.instance.send(JSON.stringify([packetIdentifier, data]));
   }
 
   /**
    * Connect to the server uri.
    */
   connect() {
-    let reconnectAmount = 0;
     const instance = new Socket(this.uri);
 
     instance.open = () => {
-      reconnectAmount = 0;
+      //
     };
 
     instance.onclose = () => {
-      if (reconnectAmount === 0) {
+      if (this.connected) {
+        this.connected = false;
         this.onDisconnectCallback();
       }
 
       setTimeout(() => {
         if (this.instance.readyState !== CONNECTED_STATE) {
-          reconnectAmount += 1;
           this.connect();
         }
       }, RECONNECT_TIME);
@@ -155,6 +155,7 @@ class Client {
         });
 
         this.jobs = jobs;
+        this.connected = true;
         this.onConnectCallback();
       } else if (this.jobs[packetIdentifier]) {
         this.jobs[packetIdentifier](data);
@@ -165,22 +166,26 @@ class Client {
   }
 }
 
-const client = new Client('ws://localhost:8080');
+for (let i = 0; i < 25; i += 1) {
+  const client = new Client('ws://localhost:8080');
 
-client.onConnect(() => {
-  console.log('connected');
-  client.emit('ping');
-});
+  client.onConnect(() => {
+    console.log('connected');
 
-client.onDisconnect(() => {
-  console.log('disconnected');
-});
+    const interval = setInterval(() => {
+      client.emit('ping', new Date().getTime());
+    });
 
-client.on('pong', () => {
-  console.log('received pong');
-});
+    setTimeout(() => {
+      clearInterval(interval);
+    }, 20000);
+  });
 
-client.connect();
+  client.onDisconnect(() => {
+    console.log('disconnected');
+  });
 
+  client.connect();
+}
 
 module.exports = Client;
