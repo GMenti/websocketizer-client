@@ -3,10 +3,10 @@
   "version": "1.0.18",
   "description": "Websocketizer client",
   "author": "Giuseppe Menti <mentifg@gmail.com>",
-  "main": "./src/index.js",
+  "main": "./lib/index.js",
   "license": "ISC",
   "scripts": {
-    "start": "node ./src/index.js",
+    "start": "node ./lib/index.js",
     "watch": "nodemon --watch src --exec \" npm run build && npm run start \"",
     "build": "rimraf lib && babel src -d lib",
     "lint": "eslint src"
