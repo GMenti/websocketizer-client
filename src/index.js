@@ -166,26 +166,4 @@ class Client {
   }
 }
 
-for (let i = 0; i < 25; i += 1) {
-  const client = new Client('ws://localhost:8080');
-
-  client.onConnect(() => {
-    console.log('connected');
-
-    const interval = setInterval(() => {
-      client.emit('ping', new Date().getTime());
-    });
-
-    setTimeout(() => {
-      clearInterval(interval);
-    }, 20000);
-  });
-
-  client.onDisconnect(() => {
-    console.log('disconnected');
-  });
-
-  client.connect();
-}
-
 module.exports = Client;
